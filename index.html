@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preventivatore Tarkett</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar no-print">
+  <h1>Preventivatore Tarkett</h1>
+  <nav>
+    <button id="tab-nuovo" class="tab active">Nuovo preventivo</button>
+    <button id="tab-clienti" class="tab">Clienti</button>
+    <button id="tab-archivio" class="tab">Archivio</button>
+  </nav>
+  <div style="display:flex; gap:8px;">
+    <button id="btn-esporta">⬇ Esporta archivio</button>
+    <button id="btn-importa">⬆ Importa archivio</button>
+    <input type="file" id="file-importa" accept="application/json" style="display:none;">
+  </div>
+</header>
+
+<main id="app"></main>
+
+<script src="data.js"></script>
+<script src="calc.js"></script>
+<script src="storage.js"></script>
+<script src="app.js"></script>
+<script>
+  document.getElementById('btn-esporta').onclick = esportaBackup;
+  document.getElementById('btn-importa').onclick = () => document.getElementById('file-importa').click();
+  document.getElementById('file-importa').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const ok = await importaBackup(file);
+      if (ok) { alert('Backup importato correttamente.'); state.view = 'archivio'; render(); }
+    }
+    e.target.value = '';
+  };
+</script>
+</body>
+</html>
