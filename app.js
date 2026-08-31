@@ -9,6 +9,7 @@ let state = {
 function nuovoPreventivoVuoto() {
   const { id, numero, data } = prossimoIdPreventivo();
   return {
+    _uid: generaUid(),
     id_preventivo: id,
     numero,
     data: data.toISOString(),
@@ -253,7 +254,7 @@ function salvaCorrente(stato) {
   }).filter(Boolean);
 
   const totali = calcolaTotali(righeCalcolate, window.CONFIG);
-  const daSalvare = { ...p, righe: righeCalcolate, stato, ...totali };
+  const daSalvare = { ...p, righe: righeCalcolate, stato, ...totali, aggiornato_il: new Date().toISOString() };
   salvaPreventivo(daSalvare);
   state.corrente = nuovoPreventivoVuoto();
   state.view = 'archivio';

@@ -34,8 +34,11 @@
   document.getElementById('file-importa').onchange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const ok = await importaBackup(file);
-      if (ok) { alert('Backup importato correttamente.'); state.view = 'archivio'; render(); }
+      const esito = await importaBackup(file);
+      if (esito) {
+        alert(`Backup unito ai dati esistenti.\nPreventivi nuovi: ${esito.aggiunti}\nPreventivi aggiornati: ${esito.aggiornati}`);
+        state.view = 'archivio'; render();
+      }
     }
     e.target.value = '';
   };
