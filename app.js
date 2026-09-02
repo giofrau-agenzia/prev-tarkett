@@ -379,6 +379,13 @@ function renderClienti() {
     </div>
 
     <div class="card">
+      <h2>Importa lista clienti (Excel o CSV)</h2>
+      <p class="hint" style="margin-bottom:10px">Carica un file dal tuo gestionale: nel passaggio successivo scegli quale colonna del file corrisponde a ciascun campo. I clienti già presenti (stessa ragione sociale) vengono aggiornati solo nei campi che il file compila; quelli nuovi vengono aggiunti.</p>
+      <input type="file" id="file-import-clienti" accept=".csv,.xlsx,.xls">
+      <div id="mappa-import-clienti" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card">
       <div class="top-row">
         <input type="text" id="f-cerca-cliente" placeholder="Cerca per ragione sociale o città" />
         <span class="muted" style="font-size:12px;color:#777">${clienti.length} clienti</span>
@@ -389,6 +396,10 @@ function renderClienti() {
       </table>
     </div>
   `;
+  document.getElementById('file-import-clienti').onchange = e => {
+    const file = e.target.files[0];
+    if (file) leggiFileClienti(file);
+  };
 
   function disegnaLista(filtro) {
     const f = (filtro || '').toLowerCase();
@@ -449,6 +460,161 @@ function renderClienti() {
     });
     renderClienti();
   };
+}
+
+// ---------------- IMPORTAZIONE LISTA CLIENTI (Excel/CSV) ----------------
+
+const CAMPI_CLIENTE = [
+  { chiave: 'ragione_sociale', etichetta: 'Ragione sociale', richiesto: true },
+  { chiave: 'indirizzo', etichetta: 'Indirizzo' },
+  { chiave: 'cap', etichetta: 'CAP' },
+  { chiave: 'citta', etichetta: 'Città' },
+  { chiave: 'provincia', etichetta: 'Provincia' },
+  { chiave: 'cellulare', etichetta: 'Cellulare' },
+  { chiave: 'email', etichetta: 'E-mail' },
+  { chiave: 'email_2', etichetta: 'E-mail 2' },
+  { chiave: 'referente', etichetta: 'Alla cortese att.ne del Sig.' },
+  { chiave: 'modalita_pagamento', etichetta: 'Modalità pagamento' },
+  { chiave: 'sconto', etichetta: 'Sconto' },
+];
+
+// prova a indovinare la colonna giusta guardando l'intestazione
+function indovinaColonna(chiave, headers) {
+  const alias = {
+    ragione_sociale: ['ragione sociale', 'cliente', 'denominazione', 'nome'],
+    indirizzo: ['indirizzo', 'via'],
+    cap: ['cap'],
+    citta: ['città', 'citta', 'comune'],
+    provincia: ['provincia', 'prov'],
+    cellulare: ['cellulare', 'telefono', 'cell', 'tel'],
+    email: ['email', 'e-mail', 'mail'],
+    email_2: ['email 2', 'e-mail 2', 'mail 2', 'seconda email'],
+    referente: ['referente', 'attenzione', 'contatto'],
+    modalita_pagamento: ['pagamento', 'modalità pagamento'],
+    sconto: ['sconto'],
+  }[chiave] || [];
+  const idx = headers.findIndex(h => alias.includes((h || '').toString().trim().toLowerCase()));
+  return idx >= 0 ? idx : -1;
+}
+
+function leggiFileClienti(file) {
+  const nome = file.name.toLowerCase();
+  if (nome.endsWith('.csv')) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const { headers, righe } = parseCSV(e.target.result);
+      mostraMappaturaImport(headers, righe);
+    };
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    if (typeof XLSX === 'undefined') {
+      alert('Impossibile leggere file Excel: manca la connessione a internet necessaria al primo utilizzo (la libreria di lettura si scarica una sola volta). In alternativa, salva il file come CSV e riprova.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const foglio = wb.Sheets[wb.SheetNames[0]];
+      const matrice = XLSX.utils.sheet_to_json(foglio, { header: 1, defval: '' });
+      const headers = (matrice[0] || []).map(h => String(h));
+      const righe = matrice.slice(1).filter(r => r.some(c => String(c).trim() !== ''));
+      mostraMappaturaImport(headers, righe);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+// parser CSV minimale, con supporto per virgola o punto e virgola e campi tra virgolette
+function parseCSV(testo) {
+  const righeTesto = testo.replace(/\r/g, '').split('\n').filter(r => r.trim() !== '');
+  const sepVirgola = (righeTesto[0].match(/,/g) || []).length;
+  const sepPuntoVirgola = (righeTesto[0].match(/;/g) || []).length;
+  const sep = sepPuntoVirgola > sepVirgola ? ';' : ',';
+  function parseRiga(riga) {
+    const campi = [];
+    let attuale = '', traVirgolette = false;
+    for (let i = 0; i < riga.length; i++) {
+      const c = riga[i];
+      if (c === '"') { traVirgolette = !traVirgolette; }
+      else if (c === sep && !traVirgolette) { campi.push(attuale); attuale = ''; }
+      else { attuale += c; }
+    }
+    campi.push(attuale);
+    return campi.map(c => c.trim());
+  }
+  const headers = parseRiga(righeTesto[0]);
+  const righe = righeTesto.slice(1).map(parseRiga);
+  return { headers, righe };
+}
+
+function mostraMappaturaImport(headers, righe) {
+  state.importClienti = { headers, righe };
+  const opzioniColonne = headers.map((h, idx) => `<option value="${idx}">${escapeHtml(h || '(colonna ' + (idx + 1) + ')')}</option>`).join('');
+  const box = document.getElementById('mappa-import-clienti');
+  box.innerHTML = `
+    <p class="hint" style="margin-bottom:10px">${righe.length} righe trovate nel file. Indica quale colonna corrisponde a ciascun campo (lascia "— Nessuna —" per i campi che il file non contiene).</p>
+    <div class="grid-3">
+      ${CAMPI_CLIENTE.map(c => {
+        const guess = indovinaColonna(c.chiave, headers);
+        return `<div>
+          <label>${escapeHtml(c.etichetta)}${c.richiesto ? ' *' : ''}</label>
+          <select id="map-${c.chiave}">
+            <option value="-1">— Nessuna —</option>
+            ${opzioniColonne}
+          </select>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:14px">
+      <button class="primary" id="btn-conferma-import-clienti">Importa ${righe.length} clienti</button>
+      <button id="btn-annulla-import-clienti">Annulla</button>
+    </div>
+  `;
+  CAMPI_CLIENTE.forEach(c => {
+    const guess = indovinaColonna(c.chiave, headers);
+    if (guess >= 0) document.getElementById(`map-${c.chiave}`).value = guess;
+  });
+  document.getElementById('btn-annulla-import-clienti').onclick = () => { box.innerHTML = ''; document.getElementById('file-import-clienti').value = ''; };
+  document.getElementById('btn-conferma-import-clienti').onclick = confermaImportClienti;
+}
+
+function confermaImportClienti() {
+  const { headers, righe } = state.importClienti;
+  const mappa = {};
+  CAMPI_CLIENTE.forEach(c => { mappa[c.chiave] = Number(document.getElementById(`map-${c.chiave}`).value); });
+  if (mappa.ragione_sociale < 0) { alert('Devi indicare almeno la colonna della Ragione sociale.'); return; }
+
+  const clientiAttuali = leggiClienti();
+  const indice = new Map(clientiAttuali.map(c => [c.ragione_sociale.trim().toLowerCase(), c]));
+  let nuovi = 0, aggiornati = 0;
+
+  righe.forEach(riga => {
+    const nome = (riga[mappa.ragione_sociale] || '').toString().trim();
+    if (!nome) return;
+    const chiave = nome.toLowerCase();
+    const importato = {};
+    CAMPI_CLIENTE.forEach(c => {
+      if (mappa[c.chiave] >= 0) {
+        const v = riga[mappa[c.chiave]];
+        if (v !== undefined && String(v).trim() !== '') importato[c.chiave] = String(v).trim();
+      }
+    });
+    importato.ragione_sociale = nome;
+
+    const esistente = indice.get(chiave);
+    if (esistente) {
+      Object.assign(esistente, importato);
+      aggiornati++;
+    } else {
+      const nuovoCliente = { ragione_sociale: nome, indirizzo: '', cap: '', citta: '', provincia: '', cellulare: '', email: '', email_2: '', referente: '', modalita_pagamento: '', sconto: '', ...importato };
+      indice.set(chiave, nuovoCliente);
+      nuovi++;
+    }
+  });
+
+  scriviClienti(Array.from(indice.values()));
+  alert(`Importazione completata.\nClienti nuovi: ${nuovi}\nClienti aggiornati: ${aggiornati}`);
+  renderClienti();
 }
 
 // ---------------- VISTA: STAMPA ----------------
