@@ -70,7 +70,7 @@ datalist { }
 @media (max-width: 720px) {
   .topbar { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
   .topbar nav { flex-wrap: wrap; }
-  .topbar > div { width: 100%; justify-content: flex-end; }
+  .topbar > div { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
 
   main { padding: 14px; }
   .card { padding: 14px; }

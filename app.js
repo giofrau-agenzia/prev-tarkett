@@ -1,5 +1,33 @@
 // App principale — nessun framework, nessun server.
 
+const PROJECT_UNLOCK_KEY = 'tarkett_project_unlocked';
+
+function projectSbloccato() {
+  return sessionStorage.getItem(PROJECT_UNLOCK_KEY) === '1';
+}
+function sbloccaProject() {
+  const pwd = prompt('Password per visualizzare i prezzi Project:');
+  if (pwd === null) return;
+  if (pwd === window.PROJECT_PASSWORD) {
+    sessionStorage.setItem(PROJECT_UNLOCK_KEY, '1');
+    aggiornaBottoneProject();
+    render();
+  } else {
+    alert('Password errata.');
+  }
+}
+function bloccaProject() {
+  sessionStorage.removeItem(PROJECT_UNLOCK_KEY);
+  aggiornaBottoneProject();
+  render();
+}
+function aggiornaBottoneProject() {
+  const btn = document.getElementById('btn-lock-project');
+  if (!btn) return;
+  btn.textContent = projectSbloccato() ? '🔓 Prezzi Project (blocca)' : '🔒 Prezzi Project';
+  btn.onclick = projectSbloccato() ? bloccaProject : sbloccaProject;
+}
+
 let state = {
   view: 'nuovo', // 'nuovo' | 'archivio' | 'stampa'
   corrente: nuovoPreventivoVuoto(),
@@ -159,6 +187,7 @@ function rigaVuota() {
 
 function rigaHtml(r, i) {
   const articolo = leggiCatalogo().find(a => a.codice_articolo === r.codice_articolo);
+  const bloccato = !projectSbloccato();
   let calcolo = null;
   if (articolo) {
     calcolo = calcolaRiga({
@@ -181,7 +210,7 @@ function rigaHtml(r, i) {
       <div>
         <label>Prezzo listino</label>
         <p style="padding-top:6px">${articolo ? euro(articolo.prezzo_listino) : '—'}</p>
-        <p class="hint">${articolo ? 'Project ' + euro(articolo.prezzo_project) : ''}</p>
+        <p class="hint">${articolo ? (bloccato ? '🔒 Project bloccato' : 'Project ' + euro(articolo.prezzo_project)) : ''}</p>
       </div>
       <div>
         <label>Sc.1</label>
@@ -191,7 +220,7 @@ function rigaHtml(r, i) {
       </div>
       <div class="riservato-opzioni">
         <label><input type="radio" name="riservato-${i}" class="r-variante" value="sc2" ${r.variante_riservato === 'sc2' ? 'checked' : ''}> Sc.2 ${calcolo ? '— ' + euro(calcolo.prezzo_dopo_sconto2) : ''}</label>
-        <label><input type="radio" name="riservato-${i}" class="r-variante" value="project" ${r.variante_riservato === 'project' ? 'checked' : ''}> Project ${calcolo ? '— ' + euro(calcolo.prezzo_project) : ''}</label>
+        <label style="${bloccato ? 'opacity:0.5' : ''}"><input type="radio" name="riservato-${i}" class="r-variante" value="project" ${r.variante_riservato === 'project' ? 'checked' : ''} ${bloccato ? 'disabled title="Inserisci la password per usare il prezzo Project"' : ''}> Project ${bloccato ? '🔒' : (calcolo ? '— ' + euro(calcolo.prezzo_project) : '')}</label>
         <label><input type="radio" name="riservato-${i}" class="r-variante" value="manuale" ${r.variante_riservato === 'manuale' ? 'checked' : ''}> Manuale</label>
         ${r.variante_riservato === 'manuale' ? `<input type="number" class="r-manuale" value="${r.prezzo_manuale}" step="0.01" style="margin-top:4px" />` : ''}
       </div>

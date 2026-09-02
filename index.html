@@ -16,6 +16,7 @@
     <button id="tab-archivio" class="tab">Archivio</button>
   </nav>
   <div style="display:flex; gap:8px;">
+    <button id="btn-lock-project">🔒 Prezzi Project</button>
     <button id="btn-esporta">⬇ Esporta archivio</button>
     <button id="btn-importa">⬆ Importa archivio</button>
     <input type="file" id="file-importa" accept="application/json" style="display:none;">
@@ -29,6 +30,7 @@
 <script src="storage.js"></script>
 <script src="app.js"></script>
 <script>
+  aggiornaBottoneProject();
   document.getElementById('btn-esporta').onclick = esportaBackup;
   document.getElementById('btn-importa').onclick = () => document.getElementById('file-importa').click();
   document.getElementById('file-importa').onchange = async (e) => {
