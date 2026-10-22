@@ -30,6 +30,10 @@ function nuovoPreventivoVuoto() {
   };
 }
 
+function varianteConsentita(variante) {
+  return variante === 'project' && !projectSbloccato() ? 'sc2' : variante;
+}
+
 const app = document.getElementById('app');
 
 document.getElementById('tab-nuovo').onclick = () => { state.view = 'nuovo'; render(); };
@@ -163,7 +167,7 @@ function rigaHtml(r, i) {
   if (articolo) {
     calcolo = calcolaRiga({
       articolo, sconto1: Number(r.sconto_1), sconto2: Number(r.sconto_2),
-      variante: r.variante_riservato, prezzoManuale: r.prezzo_manuale,
+      variante: varianteConsentita(r.variante_riservato), prezzoManuale: r.prezzo_manuale,
       quantitaRichiesta: r.quantita_richiesta,
     });
   }
@@ -181,7 +185,7 @@ function rigaHtml(r, i) {
       <div>
         <label>Prezzo listino</label>
         <p style="padding-top:6px">${articolo ? euro(articolo.prezzo_listino) : '—'}</p>
-        <p class="hint">${articolo ? 'Project ' + euro(articolo.prezzo_project) : ''}</p>
+        <p class="hint">${articolo ? 'Project ' + (projectSbloccato() ? euro(articolo.prezzo_project) : 'protetto') : ''}</p>
       </div>
       <div>
         <label>Sc.1</label>
@@ -191,7 +195,7 @@ function rigaHtml(r, i) {
       </div>
       <div class="riservato-opzioni">
         <label><input type="radio" name="riservato-${i}" class="r-variante" value="sc2" ${r.variante_riservato === 'sc2' ? 'checked' : ''}> Sc.2 ${calcolo ? '— ' + euro(calcolo.prezzo_dopo_sconto2) : ''}</label>
-        <label><input type="radio" name="riservato-${i}" class="r-variante" value="project" ${r.variante_riservato === 'project' ? 'checked' : ''}> Project ${calcolo ? '— ' + euro(calcolo.prezzo_project) : ''}</label>
+        <label><input type="radio" name="riservato-${i}" class="r-variante" value="project" ${r.variante_riservato === 'project' ? 'checked' : ''}> Project ${calcolo ? '— ' + (projectSbloccato() ? euro(calcolo.prezzo_project) : 'protetto') : ''}</label>
         <label><input type="radio" name="riservato-${i}" class="r-variante" value="manuale" ${r.variante_riservato === 'manuale' ? 'checked' : ''}> Manuale</label>
         ${r.variante_riservato === 'manuale' ? `<input type="number" class="r-manuale" value="${r.prezzo_manuale}" step="0.01" style="margin-top:4px" />` : ''}
       </div>
@@ -234,7 +238,19 @@ function bindRigaEvents(r, i) {
   el.querySelector('.r-sconto2').onchange = e => { r.sconto_2 = Number(e.target.value); render(); };
 
   el.querySelectorAll('.r-variante').forEach(radio => {
-    radio.onchange = e => { r.variante_riservato = e.target.value; render(); };
+    radio.onchange = e => {
+      if (e.target.value === 'project' && !projectSbloccato()) {
+        if (!sbloccaProject()) {
+          r.variante_riservato = 'sc2';
+          render();
+          return;
+        }
+        const btn = document.getElementById('btn-project');
+        if (btn) btn.textContent = 'Blocca Project';
+      }
+      r.variante_riservato = e.target.value;
+      render();
+    };
   });
   const manualeInput = el.querySelector('.r-manuale');
   if (manualeInput) manualeInput.onchange = e => { r.prezzo_manuale = Number(e.target.value); render(); };
@@ -254,7 +270,7 @@ function salvaCorrente(stato) {
     if (!articolo) return null;
     const calcolo = calcolaRiga({
       articolo, sconto1: Number(r.sconto_1), sconto2: Number(r.sconto_2),
-      variante: r.variante_riservato, prezzoManuale: r.prezzo_manuale,
+      variante: varianteConsentita(r.variante_riservato), prezzoManuale: r.prezzo_manuale,
       quantitaRichiesta: r.quantita_richiesta,
     });
     return { ...r, descrizione: articolo.descrizione, dimensioni: articolo.dimensioni, sito_url: articolo.sito_url, ...calcolo };

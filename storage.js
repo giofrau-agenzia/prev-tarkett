@@ -4,6 +4,8 @@ const STORAGE_KEY = 'preventivatore_tarkett_archivio';
 const CLIENTI_KEY = 'preventivatore_tarkett_clienti';
 const CATALOGO_KEY = 'preventivatore_tarkett_catalogo';
 const CATALOGO_VERSION_KEY = 'preventivatore_tarkett_catalogo_versione';
+const PROJECT_PIN_KEY = 'preventivatore_tarkett_project_pin';
+const PROJECT_UNLOCK_KEY = 'preventivatore_tarkett_project_sbloccato';
 
 function generaUid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -221,6 +223,56 @@ function salvaArticolo(articolo) {
 
 function eliminaArticolo(codice) {
   scriviCatalogo(leggiCatalogo().filter(a => a.codice_articolo !== codice));
+}
+
+// ---------------- PROTEZIONE PREZZI PROJECT ----------------
+
+function pinProjectConfigurato() {
+  return Boolean(localStorage.getItem(PROJECT_PIN_KEY));
+}
+
+function projectSbloccato() {
+  return sessionStorage.getItem(PROJECT_UNLOCK_KEY) === '1';
+}
+
+function impostaPinProject() {
+  const primo = prompt('Imposta un PIN per proteggere i prezzi Project:');
+  if (primo === null) return false;
+  if (primo.trim().length < 4) {
+    alert('Il PIN deve contenere almeno 4 caratteri.');
+    return false;
+  }
+  const conferma = prompt('Ripeti il PIN Project:');
+  if (conferma !== primo) {
+    alert('I PIN non coincidono.');
+    return false;
+  }
+  localStorage.setItem(PROJECT_PIN_KEY, primo);
+  sessionStorage.setItem(PROJECT_UNLOCK_KEY, '1');
+  return true;
+}
+
+function sbloccaProject() {
+  if (!pinProjectConfigurato()) return impostaPinProject();
+  const pin = prompt('Inserisci il PIN per visualizzare e usare i prezzi Project:');
+  if (pin === null) return false;
+  if (pin !== localStorage.getItem(PROJECT_PIN_KEY)) {
+    alert('PIN Project non corretto.');
+    return false;
+  }
+  sessionStorage.setItem(PROJECT_UNLOCK_KEY, '1');
+  return true;
+}
+
+function bloccaProject() {
+  sessionStorage.removeItem(PROJECT_UNLOCK_KEY);
+}
+
+function cambiaPinProject() {
+  if (pinProjectConfigurato() && !sbloccaProject()) return false;
+  localStorage.removeItem(PROJECT_PIN_KEY);
+  bloccaProject();
+  return impostaPinProject();
 }
 
 // ---------------- BACKUP: esporta / importa tutto l'archivio ----------------
