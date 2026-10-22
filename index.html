@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Preventivatore Tarkett</title>
 <link rel="stylesheet" href="style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -17,7 +16,8 @@
     <button id="tab-archivio" class="tab">Archivio</button>
   </nav>
   <div style="display:flex; gap:8px;">
-    <button id="btn-lock-project">🔒 Prezzi Project</button>
+    <button id="btn-importa-catalogo">Importa Catalogo</button>
+    <input type="file" id="file-importa-catalogo" accept=".csv,text/csv" style="display:none;">
     <button id="btn-esporta">⬇ Esporta archivio</button>
     <button id="btn-importa">⬆ Importa archivio</button>
     <input type="file" id="file-importa" accept="application/json" style="display:none;">
@@ -31,7 +31,22 @@
 <script src="storage.js"></script>
 <script src="app.js"></script>
 <script>
-  aggiornaBottoneProject();
+  document.getElementById('btn-importa-catalogo').onclick = () =>
+    document.getElementById('file-importa-catalogo').click();
+  document.getElementById('file-importa-catalogo').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const esito = await importaCatalogoCSV(file);
+        alert(`Catalogo aggiornato.\nArticoli importati: ${esito.articoli}`);
+        state.view = 'nuovo';
+        render();
+      } catch (errore) {
+        alert(`Impossibile importare il Catalogo.\n${errore.message}`);
+      }
+    }
+    e.target.value = '';
+  };
   document.getElementById('btn-esporta').onclick = esportaBackup;
   document.getElementById('btn-importa').onclick = () => document.getElementById('file-importa').click();
   document.getElementById('file-importa').onchange = async (e) => {

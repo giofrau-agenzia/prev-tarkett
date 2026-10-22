@@ -3,6 +3,7 @@
 const STORAGE_KEY = 'preventivatore_tarkett_archivio';
 const CLIENTI_KEY = 'preventivatore_tarkett_clienti';
 const CATALOGO_KEY = 'preventivatore_tarkett_catalogo';
+const CATALOGO_VERSION_KEY = 'preventivatore_tarkett_catalogo_versione';
 
 function generaUid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -81,6 +82,22 @@ function eliminaCliente(ragioneSociale) {
 // ---------------- CATALOGO (modificabile) ----------------
 
 function leggiCatalogo() {
+  const versioneInclusa = window.CATALOGO_VERSION || '';
+  const versioneSalvata = localStorage.getItem(CATALOGO_VERSION_KEY) || '';
+
+  // Quando l'app contiene un listino più recente, sostituisce soltanto il
+  // catalogo locale. Clienti e preventivi salvati restano invariati.
+  if (
+    versioneInclusa &&
+    !versioneSalvata.startsWith('importato-') &&
+    versioneSalvata !== versioneInclusa
+  ) {
+    const aggiornato = (window.CATALOGO || []).slice();
+    scriviCatalogo(aggiornato);
+    localStorage.setItem(CATALOGO_VERSION_KEY, versioneInclusa);
+    return aggiornato;
+  }
+
   try {
     const salvato = JSON.parse(localStorage.getItem(CATALOGO_KEY));
     if (salvato) return salvato;
@@ -92,6 +109,108 @@ function leggiCatalogo() {
 
 function scriviCatalogo(lista) {
   localStorage.setItem(CATALOGO_KEY, JSON.stringify(lista));
+}
+
+function separatoreCatalogo(testo) {
+  const primaRiga = testo.split(/\r\n|\n|\r/, 1)[0] || '';
+  const puntiVirgola = (primaRiga.match(/;/g) || []).length;
+  const virgole = (primaRiga.match(/,/g) || []).length;
+  return puntiVirgola >= virgole ? ';' : ',';
+}
+
+function parseCsvCatalogo(testo, separatore) {
+  const righe = [];
+  let riga = [], campo = '', traVirgolette = false;
+
+  for (let i = 0; i < testo.length; i++) {
+    const ch = testo[i];
+    if (traVirgolette) {
+      if (ch === '"' && testo[i + 1] === '"') {
+        campo += '"';
+        i++;
+      } else if (ch === '"') {
+        traVirgolette = false;
+      } else {
+        campo += ch;
+      }
+    } else if (ch === '"') {
+      traVirgolette = true;
+    } else if (ch === separatore) {
+      riga.push(campo);
+      campo = '';
+    } else if (ch === '\r' || ch === '\n') {
+      if (ch === '\r' && testo[i + 1] === '\n') i++;
+      riga.push(campo);
+      if (riga.some(v => v.trim() !== '')) righe.push(riga);
+      riga = [];
+      campo = '';
+    } else {
+      campo += ch;
+    }
+  }
+  riga.push(campo);
+  if (riga.some(v => v.trim() !== '')) righe.push(riga);
+  return righe;
+}
+
+function numeroCatalogo(valore) {
+  const testo = String(valore || '').trim();
+  if (!testo) return '';
+  const normalizzato = testo.includes(',')
+    ? testo.replace(/\./g, '').replace(',', '.')
+    : testo;
+  const numero = Number(normalizzato);
+  return Number.isFinite(numero) ? numero : testo;
+}
+
+async function importaCatalogoCSV(file) {
+  const bytes = await file.arrayBuffer();
+  let testo;
+  try {
+    testo = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch (e) {
+    testo = new TextDecoder('windows-1252').decode(bytes);
+  }
+  testo = testo.replace(/^\uFEFF/, '');
+
+  const righe = parseCsvCatalogo(testo, separatoreCatalogo(testo));
+  if (!righe.length) throw new Error('Il file è vuoto.');
+
+  const intestazioni = righe.shift().map(v => v.trim());
+  const richieste = [
+    'CodiceArticolo', 'Descrizione', 'Dimensioni', 'Multiplo',
+    'PrezzoListino', 'PrezzoProject', 'Prezzo50_10', 'Prezzo50_20',
+    'Prezzo50_25', 'PGC', 'BC', 'Sito', 'Selezione'
+  ];
+  if (richieste.some((nome, i) => intestazioni[i] !== nome)) {
+    throw new Error('Le colonne non corrispondono al foglio Catalogo.');
+  }
+
+  const catalogo = righe
+    .filter(r => String(r[0] || '').trim())
+    .map(r => {
+      while (r.length < 13) r.push('');
+      return {
+        codice_articolo: String(r[0]).trim(),
+        descrizione: r[1],
+        dimensioni: r[2],
+        multiplo: numeroCatalogo(r[3]),
+        prezzo_listino: numeroCatalogo(r[4]),
+        prezzo_project: numeroCatalogo(r[5]),
+        prezzo_50_10: numeroCatalogo(r[6]),
+        prezzo_50_20: numeroCatalogo(r[7]),
+        prezzo_50_25: numeroCatalogo(r[8]),
+        pgc: String(r[9] || '').trim(),
+        bc: String(r[10] || '').trim(),
+        sito_url: String(r[11] || '').trim(),
+        selezione: r[12] || `${String(r[0]).trim()} - ${r[1]}`
+      };
+    });
+
+  if (!catalogo.length) throw new Error('Nessun articolo trovato.');
+  scriviCatalogo(catalogo);
+  localStorage.setItem(CATALOGO_VERSION_KEY, `importato-${Date.now()}`);
+  return { articoli: catalogo.length };
 }
 
 function salvaArticolo(articolo) {
