@@ -217,7 +217,14 @@ function bindRigaEvents(r, i) {
   if (!el) return;
 
   el.querySelector('.r-articolo').onchange = e => {
-    const art = leggiCatalogo().find(a => a.selezione === e.target.value);
+    const valore = e.target.value.trim();
+    const valoreMinuscolo = valore.toLocaleLowerCase('it');
+    const catalogo = leggiCatalogo();
+    const art = catalogo.find(a => a.selezione === valore)
+      || catalogo.find(a => String(a.codice_articolo).trim() === valore)
+      || catalogo.find(a =>
+        String(a.selezione || '').toLocaleLowerCase('it') === valoreMinuscolo
+      );
     r.codice_articolo = art ? art.codice_articolo : '';
     render();
   };

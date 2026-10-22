@@ -87,11 +87,7 @@ function leggiCatalogo() {
 
   // Quando l'app contiene un listino più recente, sostituisce soltanto il
   // catalogo locale. Clienti e preventivi salvati restano invariati.
-  if (
-    versioneInclusa &&
-    !versioneSalvata.startsWith('importato-') &&
-    versioneSalvata !== versioneInclusa
-  ) {
+  if (versioneInclusa && versioneSalvata !== versioneInclusa) {
     const aggiornato = (window.CATALOGO || []).slice();
     scriviCatalogo(aggiornato);
     localStorage.setItem(CATALOGO_VERSION_KEY, versioneInclusa);
@@ -209,7 +205,10 @@ async function importaCatalogoCSV(file) {
 
   if (!catalogo.length) throw new Error('Nessun articolo trovato.');
   scriviCatalogo(catalogo);
-  localStorage.setItem(CATALOGO_VERSION_KEY, `importato-${Date.now()}`);
+  localStorage.setItem(
+    CATALOGO_VERSION_KEY,
+    window.CATALOGO_VERSION || `importato-${Date.now()}`
+  );
   return { articoli: catalogo.length };
 }
 
